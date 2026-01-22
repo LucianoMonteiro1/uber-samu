@@ -4,10 +4,6 @@ import { Location, SearchMatch, IncidentPriority } from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-/**
- * Processa áudio de voz para preencher automaticamente os dados de uma ocorrência.
- * Usa multimodalidade para entender contexto, endereço e gravidade.
- */
 export async function processVoiceIncident(audioBase64: string, mimeType: string) {
   const ai = getAI();
   try {
@@ -22,13 +18,12 @@ export async function processVoiceIncident(audioBase64: string, mimeType: string
         },
         {
           text: `Você é um Médico Regulador do SAMU 192. Ouça o relato da ocorrência e extraia os dados estruturados.
-          Importante: Identifique o endereço mencionado e tente ser preciso.
           Retorne estritamente em JSON:
           {
             "description": "descrição clara e técnica",
             "address": "endereço mencionado",
             "priority": "Vermelho" | "Amarelo" | "Verde" | "Azul",
-            "code": "Código de protocolo (ex: P01, P10)",
+            "occurrenceCode": "Código de protocolo (ex: P01, P10)",
             "isEmergency": boolean
           }`
         }
@@ -45,17 +40,13 @@ export async function processVoiceIncident(audioBase64: string, mimeType: string
   }
 }
 
-/**
- * Analisa a melhor rota de emergência e hospitais próximos usando Grounding do Google Maps.
- */
 export async function analyzeEmergencyRoute(incidentLocation: Location) {
   const ai = getAI();
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Como assistente tático do SAMU, analise a localização [${incidentLocation.lat}, ${incidentLocation.lng}] em Ariquemes-RO. 
-      Identifique os 3 hospitais ou UPAs mais próximos com pronto-socorro. 
-      Cite também se há tráfego pesado conhecido ou obras na região central.`,
+      Identifique hospitais próximos e condições de trânsito em tempo real.`,
       config: {
         tools: [{ googleMaps: {} }],
         toolConfig: {
@@ -76,15 +67,12 @@ export async function analyzeEmergencyRoute(incidentLocation: Location) {
   }
 }
 
-/**
- * Busca de Endereço com Grounding do Google Maps para sugestões precisas.
- */
 export async function getPlaceSuggestions(query: string, userLocation: Location): Promise<SearchMatch[]> {
   const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `Liste 5 locais exatos para "${query}" em Ariquemes, Rondônia. 
-    Retorne no formato: [Nome do Local] | [Endereço] | [Cidade] | [lat, lng]`,
+    contents: `Sugira locais para "${query}" em Ariquemes, RO. 
+    Retorne no formato: [Nome] | [Endereço] | [Cidade] | [lat, lng]`,
     config: {
       tools: [{ googleMaps: {} }],
       toolConfig: {
@@ -110,15 +98,12 @@ export async function getPlaceSuggestions(query: string, userLocation: Location)
   return matches;
 }
 
-/**
- * Triagem Inteligente: Classifica prioridade e protocolo.
- */
-export async function classifyIncident(description: string): Promise<{ priority: IncidentPriority, reason: string, code: string, suggestedUnit: 'Advanced' | 'Basic' }> {
+export async function classifyIncident(description: string): Promise<{ priority: IncidentPriority, reason: string, occurrenceCode: string, suggestedUnit: 'Advanced' | 'Basic' }> {
   const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Analise como Médico Regulador 192: "${description}"
-    Retorne JSON: { "priority": "Vermelho"|"Amarelo"|"Verde"|"Azul", "code": "Pxx - Nome", "reason": "texto", "suggestedUnit": "Advanced"|"Basic" }`,
+    contents: `Analise como Médico Regulador: "${description}"
+    Retorne JSON: { "priority": "Vermelho"|"Amarelo"|"Verde"|"Azul", "occurrenceCode": "Pxx", "reason": "texto", "suggestedUnit": "Advanced"|"Basic" }`,
     config: { responseMimeType: "application/json" }
   });
 
@@ -126,12 +111,12 @@ export async function classifyIncident(description: string): Promise<{ priority:
     const data = JSON.parse(response.text || "{}");
     return {
       priority: data.priority || IncidentPriority.MEDIUM,
-      code: data.code || 'P00',
+      occurrenceCode: data.occurrenceCode || 'P00',
       reason: data.reason || 'Análise concluída.',
       suggestedUnit: data.suggestedUnit || 'Basic'
     };
   } catch (e) {
-    return { priority: IncidentPriority.MEDIUM, code: 'P00', reason: "Erro na análise.", suggestedUnit: 'Basic' };
+    return { priority: IncidentPriority.MEDIUM, occurrenceCode: 'P00', reason: "Erro na análise.", suggestedUnit: 'Basic' };
   }
 }
 
@@ -149,12 +134,15 @@ export function decode(base64: string) {
 }
 
 export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  // CORREÇÃO: Usar offset e length do TypedArray para decodificação precisa de PCM raw
+  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
   }
   return buffer;
 }

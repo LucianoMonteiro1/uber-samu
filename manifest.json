@@ -1,13 +1,15 @@
 
 {
-  "name": "SAMU Condutor - Ariquemes",
+  "name": "SAMU Connect Ariquemes",
   "short_name": "SAMU 192",
-  "start_url": ".",
-  "display": "fullscreen",
-  "orientation": "portrait",
+  "id": "br.gov.ro.ariquemes.samu.connect.v1",
+  "start_url": "./index.html",
+  "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#FF1744",
-  "description": "Sistema tático de gestão de emergências SAMU Ariquemes.",
+  "theme_color": "#000000",
+  "description": "Sistema Operacional Tático do SAMU Ariquemes - Gestão de Frotas e Emergências.",
+  "orientation": "portrait-primary",
+  "categories": ["government", "medical", "productivity"],
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/822/822143.png",
@@ -21,13 +23,5 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Regulação Médica",
-      "url": "/?mode=dispatcher",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/822/822143.png", "sizes": "192x192" }]
-    }
-  ],
-  "prefer_related_applications": false
+  ]
 }

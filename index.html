@@ -4,14 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SAMU Condutor - Ariquemes</title>
+    <title>SAMU 192 - Ariquemes</title>
     
+    <!-- PWA Primary Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SAMU 192">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="SAMU Connect">
+    <meta name="apple-touch-fullscreen" content="yes">
     
     <meta name="theme-color" content="#000000">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/822/822143.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -19,16 +25,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-    
-    <!-- Leaflet Heatmap Plugin -->
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     
     <style>
         :root {
             --uber-black: #000000;
             --uber-white: #FFFFFF;
-            --uber-gray: #1F1F1F;
-            --uber-light-gray: #F6F6F6;
             --samu-red: #FF1744;
         }
 
@@ -48,12 +50,14 @@
             font-family: 'Inter', -apple-system, system-ui, sans-serif;
             color: white;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .uber-glass {
             background: rgba(18, 18, 18, 0.95);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
+            backdrop-filter: blur(10px);
         }
 
         .uber-btn-primary {
@@ -62,8 +66,6 @@
             font-weight: 700;
             border-radius: 8px;
             transition: all 0.2s ease;
-            text-transform: none;
-            letter-spacing: -0.01em;
         }
 
         .uber-input {
@@ -92,6 +94,11 @@
           0% { transform: translateX(100%); }
           100% { transform: translateX(-100%); }
         }
+        
+        .safe-area-inset {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
     </style>
 <script type="importmap">
 {
@@ -104,12 +111,14 @@
 }
 </script>
 </head>
-<body class="bg-black">
+<body class="bg-black safe-area-inset">
     <div id="root"></div>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW Operacional em:', reg.scope))
+            .catch(err => console.log('Falha no SW:', err));
         });
       }
     </script>

@@ -58,8 +58,10 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
     }
 
     try {
-      outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      const outCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const inCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      outputAudioContextRef.current = outCtx;
+      inputAudioContextRef.current = inCtx;
       
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
@@ -70,30 +72,30 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks: {
           onopen: () => {
-            if (!inputAudioContextRef.current) return;
-            const source = inputAudioContextRef.current.createMediaStreamSource(stream);
-            const processor = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
+            if (!inCtx) return;
+            const source = inCtx.createMediaStreamSource(stream);
+            const processor = inCtx.createScriptProcessor(4096, 1, 1);
             
             processor.onaudioprocess = (e) => {
-              // BUG FIX: Garantia de envio apenas se a sessão estiver ativa
-              if (!sessionRef.current) return;
-              
+              // PADRÃO RECOMENDADO: Usar sessionPromise.then para evitar race conditions
               const inputData = e.inputBuffer.getChannelData(0);
               const int16 = new Int16Array(inputData.length);
               for (let i = 0; i < inputData.length; i++) {
                 int16[i] = inputData[i] * 32768;
               }
               
-              sessionRef.current.sendRealtimeInput({
-                media: {
-                  data: encode(new Uint8Array(int16.buffer)),
-                  mimeType: 'audio/pcm;rate=16000',
-                }
+              const pcmData = {
+                data: encode(new Uint8Array(int16.buffer)),
+                mimeType: 'audio/pcm;rate=16000',
+              };
+
+              sessionPromise.then(session => {
+                session.sendRealtimeInput({ media: pcmData });
               });
             };
 
             source.connect(processor);
-            processor.connect(inputAudioContextRef.current.destination);
+            processor.connect(inCtx.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.serverContent?.outputTranscription) {
@@ -103,34 +105,33 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
             }
 
             const audioBase64 = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audioBase64 && outputAudioContextRef.current) {
-              const ctx = outputAudioContextRef.current;
-              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
+            if (audioBase64 && outCtx) {
+              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outCtx.currentTime);
               
-              const buffer = await decodeAudioData(decode(audioBase64), ctx, 24000, 1);
-              const source = ctx.createBufferSource();
+              const buffer = await decodeAudioData(decode(audioBase64), outCtx, 24000, 1);
+              const source = outCtx.createBufferSource();
               source.buffer = buffer;
-              source.connect(ctx.destination);
+              source.connect(outCtx.destination);
               
               source.addEventListener('ended', () => sourcesRef.current.delete(source));
               source.start(nextStartTimeRef.current);
               nextStartTimeRef.current += buffer.duration;
-              sourcesRef.add(source);
+              sourcesRef.current.add(source);
             }
 
             if (message.toolCall) {
               for (const fc of message.toolCall.functionCalls) {
                 if (fc.name === 'logOperationalEvent') {
                   onOperationalLog(fc.args.eventType as string, fc.args.data as string);
-                  if (sessionRef.current) {
-                    sessionRef.current.sendToolResponse({
-                      functionResponses: {
+                  sessionPromise.then(session => {
+                    session.sendToolResponse({
+                      functionResponses: [{
                         id: fc.id,
                         name: fc.name,
                         response: { result: "OK" },
-                      }
+                      }]
                     });
-                  }
+                  });
                 }
               }
             }
@@ -145,7 +146,7 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
           onerror: () => cleanup()
         },
         config: {
-          systemInstruction: `Você é o copiloto do SAMU. Condutor: ${driverName}. Ajude com logística e protocolos.`,
+          systemInstruction: `Você é o copiloto do SAMU. Condutor: ${driverName}. Ajude com logística e protocolos. Responda de forma curta e firme.`,
           responseModalities: [Modality.AUDIO],
           tools: [{ functionDeclarations: [logOperationalEventFunctionDeclaration] }],
           outputAudioTranscription: {},
@@ -156,10 +157,10 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
         }
       });
 
-      // BUG FIX: Armazenar a instância resolvida no ref
       sessionRef.current = await sessionPromise;
       setIsActive(true);
     } catch (err) {
+      console.error("Erro ao iniciar assistente:", err);
       cleanup();
     }
   };
@@ -168,6 +169,10 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
     <div className={`fixed flex flex-col items-end gap-3 z-50 bottom-6 right-6`}>
       {isActive && (aiSpeech || transcription) && (
         <div className={`p-4 rounded-3xl max-w-sm bg-slate-900/95 backdrop-blur-xl border border-blue-500/30 animate-fade-in mb-2`}>
+          <div className="flex gap-2 mb-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+            <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">IA Operacional Ativa</p>
+          </div>
           <p className="text-sm text-white font-bold italic leading-tight">
             {transcription || aiSpeech}
           </p>
@@ -182,7 +187,7 @@ const VoiceAssistantUI: React.FC<VoiceAssistantUIProps> = ({ onStatusUpdate, onO
             : 'bg-white border-slate-200 text-slate-800'
         }`}
       >
-        <ICONS.Microphone />
+        <ICONS.Microphone thick />
       </button>
     </div>
   );

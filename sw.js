@@ -1,59 +1,57 @@
 
-const CACHE_NAME = 'samu-connect-v4-final';
-const RECORDINGS_CACHE = 'samu-voice-recordings';
-
-const ASSETS_TO_CACHE = [
-  './',
-  'index.html',
-  'manifest.json',
+const CACHE_NAME = 'samu-connect-v6-static';
+const EXTERNAL_ASSETS = [
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css',
+  'https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css',
+  'https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js',
+  'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'
+];
+
+const LOCAL_ASSETS = [
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll([...LOCAL_ASSETS, ...EXTERNAL_ASSETS]);
+    })
   );
 });
 
-// Listener para notificações de despacho (vêm da aba ativa ou push)
-self.addEventListener('push', (event) => {
-  const data = event.data?.json() || { title: 'NOVA OCORRÊNCIA', body: 'Despacho imediato!' };
-  
-  const options = {
-    body: data.body,
-    icon: 'https://cdn-icons-png.flaticon.com/512/822/822143.png',
-    badge: 'https://cdn-icons-png.flaticon.com/512/822/822143.png',
-    vibrate: [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40],
-    data: { url: self.location.origin },
-    tag: 'emergency-dispatch',
-    renotify: true,
-    requireInteraction: true, // Mantém na tela até o usuário agir
-    actions: [
-      { action: 'open', title: 'VER MAPA' }
-    ]
-  };
-
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      if (clientList.length > 0) return clientList[0].focus();
-      return clients.openWindow('./');
+    caches.keys().then((keys) => {
+      return Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
     })
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('generativelanguage.googleapis.com')) return;
+  if (event.request.url.includes('generativelanguage.googleapis.com')) {
+    return event.respondWith(fetch(event.request));
+  }
+
   event.respondWith(
-    caches.match(event.request).then((response) => response || fetch(event.request))
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) return cachedResponse;
+      return fetch(event.request).then((networkResponse) => {
+        if (event.request.url.includes('cartocdn.com') || event.request.url.includes('unpkg.com')) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+        }
+        return networkResponse;
+      });
+    }).catch(() => {
+      if (event.request.mode === 'navigate') {
+        return caches.match('./index.html');
+      }
+    })
   );
 });

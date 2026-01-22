@@ -128,7 +128,8 @@ const App: React.FC = () => {
                 priority: d.priority!, 
                 location: d.location!, 
                 type: 'Clinical', 
-                occurrenceCode: d.code 
+                // Fix: Corrected property name from 'code' to 'occurrenceCode' which is valid on Partial<Incident>
+                occurrenceCode: d.occurrenceCode 
               };
               setIncidents(prev => [newInc, ...prev]);
               await persistenceService.saveIncident(newInc);

@@ -76,34 +76,37 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
 
   const handleCreate = async () => {
     setIsBusy(true);
-    const triage = await classifyIncident(desc);
-    const analysis = await analyzeEmergencyRoute(loc);
-    setRouteAnalysis(analysis);
+    try {
+      const triage = await classifyIncident(desc);
+      const analysis = await analyzeEmergencyRoute(loc);
+      setRouteAnalysis(analysis);
 
-    onAddIncident({
-      description: desc,
-      priority: triage.priority,
-      occurrenceCode: triage.code,
-      location: loc,
-      type: 'Clinical'
-    });
-    
-    setDesc('');
-    setAddress('');
-    setShowForm(false);
-    setIsBusy(false);
+      onAddIncident({
+        description: desc,
+        priority: triage.priority,
+        occurrenceCode: triage.occurrenceCode,
+        location: loc,
+        type: 'Clinical'
+      });
+      
+      setDesc('');
+      setAddress('');
+      setShowForm(false);
+    } catch (e) {
+      console.error("Erro na criação:", e);
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const handleDispatch = (incId: string, ambId: string) => {
     setDispatchingId(incId);
-    // Simula feedback visual de "Enviando Rota"
     setTimeout(() => {
       onDispatch(incId, ambId);
       setDispatchingId(null);
     }, 800);
   };
 
-  // Categorização para o ticker do rodapé
   const pendingIncidents = useMemo(() => incidents.filter(i => !i.assignedAmbulanceId), [incidents]);
   const activeIncidents = useMemo(() => incidents.filter(i => i.assignedAmbulanceId), [incidents]);
 
@@ -111,9 +114,8 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
     <div className="relative h-full w-full bg-black overflow-hidden flex flex-col">
       <MapView ambulances={ambulances} incidents={incidents} bases={bases} center={loc} />
 
-      {/* Header e Formulário */}
       <div className="absolute top-6 inset-x-6 z-[100] flex flex-col items-center gap-4 pointer-events-none">
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto w-full max-w-lg">
           {!showForm ? (
             <div className="flex flex-col items-center gap-2">
               <button onClick={() => setShowForm(true)} className="uber-glass px-8 py-4 bg-white text-black flex items-center gap-4 shadow-2xl hover:scale-105 transition-all">
@@ -121,7 +123,7 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
                 <p className="text-xs font-bold uppercase tracking-tight">Nova Ocorrência Ariquemes</p>
               </button>
               {routeAnalysis && (
-                <div className="uber-glass p-4 max-w-sm border-white/10 animate-reveal">
+                <div className="uber-glass p-4 w-full border-white/10 animate-reveal">
                   <p className="text-[10px] font-bold text-zinc-500 uppercase mb-2">Análise de Rota Gemini</p>
                   <p className="text-[11px] text-white/80 leading-relaxed mb-3">{routeAnalysis.text}</p>
                   <div className="flex flex-wrap gap-2">
@@ -137,7 +139,7 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
               )}
             </div>
           ) : (
-            <div className="w-full max-w-lg uber-glass p-6 animate-reveal">
+            <div className="uber-glass p-6 animate-reveal bg-black/95">
               <div className="flex justify-between items-center mb-6">
                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Regulação Médica</h3>
                  <button onClick={() => setShowForm(false)} className="text-white/20 hover:text-white">✕</button>
@@ -156,7 +158,7 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
                     onMouseUp={stopRecording}
                     onTouchStart={startRecording}
                     onTouchEnd={stopRecording}
-                    className={`absolute right-4 bottom-4 p-3 rounded-full transition-all ${isRecording ? 'bg-red-600 scale-125 animate-pulse text-white' : 'bg-white/5 text-zinc-500'}`}
+                    className={`absolute right-4 bottom-4 p-3 rounded-full transition-all ${isRecording ? 'bg-red-600 scale-125 animate-pulse text-white shadow-lg' : 'bg-white/5 text-zinc-500'}`}
                   >
                     <ICONS.Microphone />
                   </button>
@@ -175,7 +177,7 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
                 </button>
                 
                 {isRecording && (
-                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-tighter text-center animate-pulse">Gravando áudio para triagem IA...</p>
+                  <p className="text-[10px] text-red-500 font-black uppercase tracking-widest text-center animate-pulse">Gravando para Triagem IA...</p>
                 )}
               </div>
             </div>
@@ -183,7 +185,6 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
         </div>
       </div>
 
-      {/* Rodapé com Scroll de Situação Atual */}
       <div className="absolute bottom-0 inset-x-0 z-[100] bg-black/80 backdrop-blur-xl border-t border-white/5 pt-4 pb-6 px-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -197,7 +198,6 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
         </div>
 
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-          {/* Sessão de Pendentes */}
           {pendingIncidents.map(inc => (
             <div key={inc.id} className="min-w-[300px] bg-[#111] border border-white/5 p-4 rounded-xl relative overflow-hidden group">
               {dispatchingId === inc.id && (
@@ -206,55 +206,25 @@ const DispatcherView: React.FC<DispatcherViewProps> = ({ ambulances, incidents, 
                 </div>
               )}
               <div className="flex justify-between items-start mb-3">
-                <span className="text-[11px] font-black text-red-500 italic uppercase">{inc.occurrenceCode}</span>
-                <span className="text-[9px] text-zinc-600 font-mono tracking-tighter">AGUARDANDO VIATURA</span>
+                <span className="text-[11px] font-black text-red-500 italic uppercase">{inc.occurrenceCode || 'P--'}</span>
+                <span className="text-[9px] text-zinc-600 font-mono tracking-tighter uppercase font-bold">Aguardando Viatura</span>
               </div>
-              <h5 className="text-white text-xs font-bold mb-4 line-clamp-1 italic">{inc.description}</h5>
+              <h5 className="text-white text-xs font-bold mb-4 line-clamp-1 italic">"{inc.description}"</h5>
               
               <div className="grid grid-cols-2 gap-2">
                  {ambulances.filter(a => a.status === AmbulanceStatus.AVAILABLE).slice(0, 2).map(amb => (
                    <button 
                     key={amb.id} 
                     onClick={() => handleDispatch(inc.id, amb.id)} 
-                    className="bg-white text-black p-2 rounded-lg flex flex-col items-center hover:bg-zinc-200 transition-all active:scale-95"
+                    className="bg-white text-black p-2 rounded-lg flex flex-col items-center hover:bg-zinc-200 transition-all active:scale-95 shadow-md"
                    >
                      <span className="text-[9px] font-black uppercase tracking-tighter">{amb.name}</span>
-                     <span className="text-[8px] font-medium opacity-60">Enviar Rota</span>
+                     <span className="text-[8px] font-bold opacity-60">Enviar Rota</span>
                    </button>
                  ))}
-                 {ambulances.filter(a => a.status === AmbulanceStatus.AVAILABLE).length === 0 && (
-                   <div className="col-span-2 text-center py-2 text-[10px] text-zinc-500 italic font-medium uppercase">Nenhuma USA/USB disponível</div>
-                 )}
               </div>
             </div>
           ))}
-
-          {/* Sessão de Ativos (Em Curso) */}
-          {activeIncidents.map(inc => {
-            const assignedAmb = ambulances.find(a => a.id === inc.assignedAmbulanceId);
-            return (
-              <div key={inc.id} className="min-w-[260px] bg-zinc-900/50 border border-white/10 p-4 rounded-xl">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: assignedAmb ? getStatusColor(assignedAmb.status) : '#555' }}></div>
-                    <span className="text-[10px] font-bold text-white uppercase">{assignedAmb?.name || '---'}</span>
-                  </div>
-                  <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">{assignedAmb?.status || 'Finalizado'}</span>
-                </div>
-                <h5 className="text-white/60 text-[11px] font-medium mb-2 line-clamp-1">{inc.description}</h5>
-                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-white transition-all duration-1000" 
-                    style={{ 
-                      width: assignedAmb?.status === AmbulanceStatus.EN_ROUTE ? '33%' : 
-                             assignedAmb?.status === AmbulanceStatus.AT_SCENE ? '66%' : 
-                             assignedAmb?.status === AmbulanceStatus.TRANSPORTING ? '90%' : '100%' 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            );
-          })}
 
           {incidents.length === 0 && (
             <div className="w-full py-12 text-center border-2 border-dashed border-white/5 rounded-xl">
