@@ -1,0 +1,9 @@
+{
+  "name": "SAMU Condutor - Ariquemes",
+  "description": "Plataforma avançada de despacho e monitoramento para condutores do SAMU 192, com integração GPS em tempo real, telemetria e inteligência artificial para otimização de rotas de emergência.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation",
+    "camera"
+  ]
+}

@@ -1,0 +1,33 @@
+
+{
+  "name": "SAMU Condutor - Ariquemes",
+  "short_name": "SAMU 192",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#FF1744",
+  "description": "Sistema tático de gestão de emergências SAMU Ariquemes.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/822/822143.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/822/822143.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Regulação Médica",
+      "url": "/?mode=dispatcher",
+      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/822/822143.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
